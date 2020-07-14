@@ -1,0 +1,723 @@
+---
+title: "Raclo_FLB_4_paper"
+author: "Tove Freiburghaus"
+date: '2020-02-06'
+output: html_document
+---
+
+Part 1. Freesurfer data. 
+
+:::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+Import BPNDs. PET2 is raclopride data- evening runs (all subjects have gone thorugh this), PET4 is FLB data, all subjects have gone thorugh this.
+```{r}
+library(readxl)
+PET2_SRTM <- read_excel("X:/kipet/atlas_images/human/vff/Tove/RLS/BPNDs/PET2_SRTM.xls")
+
+library(readxl)
+PET4_SRTM <- read_excel("X:/kipet/atlas_images/human/vff/Tove/RLS/BPNDs/PET4_SRTM.xls")
+
+
+```
+
+function for getting descriptve data:
+```{r}
+## Summarizes data.
+## Gives count, mean, standard deviation, standard error of the mean, and confidence interval (default 95%).
+##   data: a data frame.
+##   measurevar: the name of a column that contains the variable to be summariezed
+##   groupvars: a vector containing names of columns that contain grouping variables
+##   na.rm: a boolean that indicates whether to ignore NA's
+##   conf.interval: the percent range of the confidence interval (default is 95%)
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=TRUE,
+                      conf.interval=.95, .drop=TRUE) {
+    library(plyr)
+
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+        if (na.rm) sum(!is.na(x))
+        else       length(x)
+    }
+
+    # This does the summary. For each group's data frame, return a vector with
+    # N, mean, and sd
+    datac <- ddply(data, groupvars, .drop=.drop,
+      .fun = function(xx, col) {
+        data.frame(ROI  = measurevar, 
+          N  = length2(xx[[col]], na.rm=na.rm),
+          mean = mean (xx[[col]], na.rm=na.rm),
+          sd   = sd (xx[[col]], na.rm=na.rm)
+        )
+      },
+      measurevar
+    )
+
+
+    
+
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean, add that column
+
+    # confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult #add column of confidence interval
+
+    return(datac)
+}
+```
+
+
+Get all descriptive stats in one data frame. 
+```{r}
+library(plyr)
+Raclo <- PET2_SRTM
+FLB <- PET4_SRTM
+Raclosum <- NULL
+Raclosum <- data.frame()
+
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "FC"))
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "OC"))
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "TC"))
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "AMG"))
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "CAU"))
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "CER"))
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "HIP"))
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "INS"))
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "PUT"))
+Raclosum <- rbind(Raclosum, summarySE(data = Raclo,measurevar = "THA"))
+
+Raclosum <- Raclosum[,-c(1,3)] #exclude unnecessary data
+    # Rename the "mean" column   
+colnames(Raclosum)<-c("ROI","mean_raclo","sd_raclo","se_raclo","ci_raclo")
+
+
+FLBsum <- NULL
+FLBsum <- data.frame()
+
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "FC"))
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "OC"))
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "TC"))
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "AMG"))
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "CAU"))
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "CER"))
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "HIP"))
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "INS"))
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "PUT"))
+FLBsum <- rbind(FLBsum,summarySE(data = FLB, measurevar = "THA"))
+
+FLBsum <- FLBsum[,-c(1,3)]
+colnames(FLBsum)<-c("ROI","mean_FLB","sd_FLB","se_FLB","ci_FLB") #renamed into the name of mean_x
+
+
+Statistics <- cbind(Raclosum,FLBsum)
+Statistics <- Statistics[-c(6,8),-6] #removing extra column. 
+sort <- c(2,1,3,6,7,4,8,5)
+Statisticssort <- cbind(Statistics,sort)
+Statisticssort2 <- Statisticssort[order(sort),]
+Statistics <- Statisticssort2[,-10]
+
+Statisticsexs <- Statistics[-c(7,8),] #REMOVE striatal!!
+```
+
+Table - correlation between raclopride and flb- average INS + CER REMOVED, only extrastriatal
+
+correlation och ci för figur 1. - Exclude?
+```{r}
+
+
+correlationRacloFLB <- cor(Statisticsexs$mean_raclo,Statisticsexs$mean_FLB)
+
+ci_lower <- NULL
+ci_lower <- numeric()
+ci_lower <- c(ci_lower,cor.test(Statisticsexs$mean_raclo,Statisticsexs$mean_FLB)$conf.int[1])
+
+
+ci_upper <- NULL
+ci_upper <- numeric()
+ci_upper <- c(ci_upper,cor.test(Statisticsexs$mean_raclo,Statisticsexs$mean_FLB)$conf.int[2])
+
+
+confidence_flb <- data.frame(ci_lower,ci_upper)
+
+sq_R <- correlationRacloFLB^2
+
+table_corrRacFLB <- data.frame(correlationRacloFLB, sq_R, confidence_flb)
+
+writexl::write_xlsx(table_corrRacFLB, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/Table_corr_Raclo_FLB.xlsx")
+
+
+```
+
+Create a table including Hall data and mean BPNDs along with statistics. 
+Table 1
+```{r}
+
+
+library(readxl)
+MOP <- read_excel("X:/kipet/atlas_images/human/vff/Tove/RLS/Descriptive data_hall.xls", sheet = "MOP") #read table with values from Hall article.
+MOP <- MOP[-c(2,4),] #remove cer and ins
+
+Stat_hall <- cbind(MOP,Statistics)
+Stat_hallx <- Stat_hall[,-3] #extra columns + cerebellum and insula removed
+
+writexl::write_xlsx(Stat_hallx, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/Stat_hall.xlsx") #Table 1
+```
+Colorplot of all individuals' BPNDs using raclo vs FLB, excluding striatal
+
+Figure 1
+
+```{r}
+#setwd("X:/kipet/atlas_images/human/vff/Tove/Results_R_RLS")
+setwd("X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results")
+library(tidyverse)
+library(plyr)
+
+ROI <- c("OC","OC","OC","OC","OC","OC","OC","OC","OC","OC","OC","OC","OC","OC","OC","OC","FC","FC","FC","FC","FC","FC","FC","FC","FC","FC","FC","FC","FC","FC","FC","FC","TC","TC","TC","TC","TC","TC","TC","TC","TC","TC","TC","TC","TC","TC","TC","TC","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","THA","THA","THA","THA","THA","THA","THA","THA","THA","THA","THA","THA","THA","THA","THA","THA","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG")
+
+
+RacloAll <- c(PET2_SRTM$OC,PET2_SRTM$FC,PET2_SRTM$TC,PET2_SRTM$HIP,PET2_SRTM$THA,PET2_SRTM$AMG)
+
+FLBAll <- c(PET4_SRTM$OC,PET4_SRTM$FC,PET4_SRTM$TC,PET4_SRTM$HIP,PET4_SRTM$THA,PET4_SRTM$AMG)
+
+allBP <- data.frame(ROI,RacloAll,FLBAll)
+
+
+neworder <- c("OC","FC","TC","HIP","THA","AMG")
+allBP2 <- arrange(transform(allBP,
+             ROI=factor(ROI,levels=neworder)),ROI)
+col <- ggplot(allBP2,aes(x=FLBAll,y= RacloAll,color=ROI))+
+  geom_point() + 
+  geom_smooth(method = 'lm',se = F) +  
+  facet_wrap(ROI ~ ., scales = 'free') +
+  labs(y= "[11C]Raclopride",x = "[11C]FLB-457")+
+  ggtitle("Correlation between [11C]Raclopride and [11C]FLB-457 BPND")+
+  theme(plot.title = element_text(hjust =0.5)) + 
+  theme_bw() 
+
+print(col)
+ggsave("AllBP_colorES.png") #Figure 1
+```
+
+
+
+
+
+
+
+Make a table with all BPNBs for raclo and flb, pet2 and 4 each roi in separate columns - Column 1 of table 2. 
+```{r}
+
+
+
+all_racloflb <- NULL
+all_racloflb <- data.frame()
+raclo_bp <- PET2_SRTM[,-c(7,9)] #remove data for insula and cer!
+colnames(raclo_bp)<-c("Subject","OC_raclo","FC_raclo","TC_raclo","HIP_raclo","THA_raclo","AMG_raclo","CAU_raclo","PUT_raclo")
+
+
+flb_bp <- PET4_SRTM[,-c(7,9)] #remove data for insula and cer!
+colnames(flb_bp)<-c("Subject","OC_flb","FC_flb","TC_flb","HIP_flb","THA_flb","AMG_flb","CAU_flb","PUT_flb")
+
+
+all_racloflb <- merge(x = raclo_bp,flb_bp,by = 'Subject') #Get the mean of BPNDs for raclopride and FLB for subject who have done morning and afternoon runs. ST?MMER!
+correlation_all_racloflb <- NULL
+
+correlation_all_racloflb <- c(correlation_all_racloflb, cor(all_racloflb$OC_raclo,all_racloflb$OC_flb))
+correlation_all_racloflb <- c(correlation_all_racloflb, cor(all_racloflb$FC_raclo,all_racloflb$FC_flb))
+correlation_all_racloflb <- c(correlation_all_racloflb, cor(all_racloflb$TC_raclo,all_racloflb$TC_flb))
+correlation_all_racloflb <- c(correlation_all_racloflb, cor(all_racloflb$HIP_raclo,all_racloflb$HIP_flb))
+correlation_all_racloflb <- c(correlation_all_racloflb, cor(all_racloflb$THA_raclo,all_racloflb$THA_flb))
+correlation_all_racloflb <- c(correlation_all_racloflb, cor(all_racloflb$AMG_raclo,all_racloflb$AMG_flb))
+correlation_all_racloflb <- c(correlation_all_racloflb, cor(all_racloflb$CAU_raclo,all_racloflb$CAU_flb))
+correlation_all_racloflb <- c(correlation_all_racloflb, cor(all_racloflb$PUT_raclo,all_racloflb$PUT_flb))
+
+
+ci_lower <- NULL
+ci_lower <- c(ci_lower,cor.test(all_racloflb$OC_raclo,all_racloflb$OC_flb)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_racloflb$FC_raclo,all_racloflb$FC_flb)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_racloflb$TC_raclo,all_racloflb$TC_flb)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_racloflb$HIP_raclo,all_racloflb$HIP_flb)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_racloflb$THA_raclo,all_racloflb$THA_flb)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_racloflb$AMG_raclo,all_racloflb$AMG_flb)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_racloflb$CAU_raclo,all_racloflb$CAU_flb)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_racloflb$PUT_raclo,all_racloflb$PUT_flb)$conf.int[1])
+
+
+
+ci_upper <- NULL
+ci_upper <- numeric()
+ci_upper <- c(ci_upper,cor.test(all_racloflb$OC_raclo,all_racloflb$OC_flb)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_racloflb$FC_raclo,all_racloflb$FC_flb)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_racloflb$TC_raclo,all_racloflb$TC_flb)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_racloflb$HIP_raclo,all_racloflb$HIP_flb)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_racloflb$THA_raclo,all_racloflb$THA_flb)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_racloflb$AMG_raclo,all_racloflb$AMG_flb)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_racloflb$CAU_raclo,all_racloflb$CAU_flb)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_racloflb$PUT_raclo,all_racloflb$PUT_flb)$conf.int[2])
+
+sq_R <- correlation_all_racloflb^2
+
+ROI <- c("OC","FC","TC","HIP","THA","AMG","CAU","PUT")
+table_correlation_all_racloflb <- data.frame(ROI,correlation_all_racloflb, sq_R, ci_lower,ci_upper)
+colnames(table_correlation_all_racloflb)[2] <- "correlation Raclopride to FLB" #change the column name
+
+writexl::write_xlsx(table_correlation_all_racloflb, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/table_correlation_all_racloflb.xlsx")
+```
+
+:::::::::::::::::::::::::::::::::::::::::
+Test - retest
+:::::::::::::::::::::::::::::::::::::::::
+
+Test- retest. 
+Now I want to use the data that has not previously been used, data from PET1 and PET3. PET1 is the morning run of raclopride and PET3 is the morning run of FLB. Not all subjects have done each morning run.
+```{r}
+library(readxl)
+PET1_SRTM <- read_excel("X:/kipet/atlas_images/human/vff/Tove/RLS/BPNDs/PET1_SRTM.xls")
+
+
+library(readxl)
+PET3_SRTM <- read_excel("X:/kipet/atlas_images/human/vff/Tove/RLS/BPNDs/PET3_SRTM.xls")
+
+```
+
+
+Test-retest: Column 2 and 3 of table 2
+```{r}
+
+all_raclo <- NULL
+all_raclo <- data.frame()
+raclo_morning <- PET1_SRTM[,-c(7,9)] #remove data for insula and cer!
+colnames(raclo_morning)<-c("Subject","FC_morning","OC_morning","TC_morning","AMG_morning","CAU_morning","HIP_morning","PUT_morning","THA_morning")
+
+raclo_afternoon <-PET2_SRTM[,-c(7,9)]
+colnames(raclo_afternoon)<- c("Subject","FC_afternoon","OC_afternoon","TC_afternoon","AMG_afternoon","CAU_afternoon","HIP_afternoon","PUT_afternoon","THA_afternoon")
+
+all_raclo <- merge(x = raclo_morning,raclo_afternoon,by = 'Subject')
+
+ROI <- c("OC","FC","TC","HIP","THA","AMG","CAU","PUT")
+
+#Correlate the BPNDs in the morning and afternoon
+corrRaclo <- NULL
+corrRaclo <- numeric()
+
+
+corrRaclo <- c(corrRaclo,cor(all_raclo$OC_morning,all_raclo$OC_afternoon))
+corrRaclo <- c(corrRaclo,cor(all_raclo$FC_morning,all_raclo$FC_afternoon))
+corrRaclo <- c(corrRaclo, cor(all_raclo$TC_morning,all_raclo$TC_afternoon))
+corrRaclo <- c(corrRaclo, cor(all_raclo$HIP_morning,all_raclo$HIP_afternoon))
+corrRaclo <- c(corrRaclo, cor(all_raclo$THA_morning,all_raclo$THA_afternoon))
+corrRaclo <- c(corrRaclo, cor(all_raclo$AMG_morning,all_raclo$AMG_afternoon))
+corrRaclo <- c(corrRaclo,cor(all_raclo$CAU_morning,all_raclo$CAU_afternoon))
+corrRaclo <- c(corrRaclo,cor(all_raclo$PUT_morning,all_raclo$PUT_afternoon))
+
+
+ci_lower <- NULL
+ci_lower <- numeric()
+ci_lower <- c(ci_lower,cor.test(all_raclo$OC_morning,all_raclo$OC_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_raclo$FC_morning,all_raclo$FC_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_raclo$TC_morning,all_raclo$TC_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_raclo$HIP_morning,all_raclo$HIP_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_raclo$THA_morning,all_raclo$THA_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_raclo$AMG_morning,all_raclo$AMG_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_raclo$CAU_morning,all_raclo$CAU_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_raclo$PUT_morning,all_raclo$PUT_afternoon)$conf.int[1])
+
+ci_upper <- NULL
+ci_upper <- numeric()
+ci_upper <- c(ci_upper,cor.test(all_raclo$OC_morning,all_raclo$OC_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_raclo$FC_morning,all_raclo$FC_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_raclo$TC_morning,all_raclo$TC_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_raclo$HIP_morning,all_raclo$HIP_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_raclo$THA_morning,all_raclo$THA_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_raclo$AMG_morning,all_raclo$AMG_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_raclo$CAU_morning,all_raclo$CAU_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_raclo$PUT_morning,all_raclo$PUT_afternoon)$conf.int[2])
+
+
+sq_R <- corrRaclo^2
+
+corrRacCi <- data.frame(ROI, corrRaclo, sq_R, ci_lower,ci_upper)
+
+
+#####
+
+all_FLB <-NULL
+all_FLB <- data.frame()
+FLB_morning <- PET3_SRTM[,-c(7,9)]
+colnames(FLB_morning)<-c("Subject","FC_morning","OC_morning","TC_morning","AMG_morning","CAU_morning","HIP_morning","PUT_morning","THA_morning")
+
+FLB_afternoon <- PET4_SRTM[,-c(7,9)]
+colnames(FLB_afternoon)<- c("Subject","FC_afternoon","OC_afternoon","TC_afternoon","AMG_afternoon","CAU_afternoon","HIP_afternoon","PUT_afternoon","THA_afternoon")
+
+all_FLB <- merge(x = FLB_morning,FLB_afternoon,by = 'Subject')
+
+corrFLB <- NULL
+corrFLB <- numeric()
+
+corrFLB <- c(corrFLB,cor(all_FLB$OC_morning,all_FLB$OC_afternoon))
+corrFLB <- c(corrFLB,cor(all_FLB$FC_morning,all_FLB$FC_afternoon))
+corrFLB <- c(corrFLB,cor(all_FLB$TC_morning,all_FLB$TC_afternoon))
+corrFLB <- c(corrFLB, cor(all_FLB$HIP_morning,all_FLB$HIP_afternoon))
+corrFLB <- c(corrFLB,cor(all_FLB$THA_morning,all_FLB$THA_afternoon))
+corrFLB <- c(corrFLB,cor(all_FLB$AMG_morning,all_FLB$AMG_afternoon))
+corrFLB <- c(corrFLB, cor(all_FLB$CAU_morning,all_FLB$CAU_afternoon))
+corrFLB <- c(corrFLB,cor(all_FLB$PUT_morning,all_FLB$PUT_afternoon))
+
+ci_lower <- NULL
+ci_lower <- numeric()
+ci_lower <- c(ci_lower,cor.test(all_FLB$OC_morning,all_FLB$OC_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_FLB$FC_morning,all_FLB$FC_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_FLB$TC_morning,all_FLB$TC_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_FLB$HIP_morning,all_FLB$HIP_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_FLB$THA_morning,all_FLB$THA_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_FLB$AMG_morning,all_FLB$AMG_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_FLB$CAU_morning,all_FLB$CAU_afternoon)$conf.int[1])
+ci_lower <- c(ci_lower,cor.test(all_FLB$PUT_morning,all_FLB$PUT_afternoon)$conf.int[1])
+
+ci_upper <- NULL
+ci_upper <- numeric()
+ci_upper <- c(ci_upper,cor.test(all_FLB$OC_morning,all_FLB$OC_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_FLB$FC_morning,all_FLB$FC_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_FLB$TC_morning,all_FLB$TC_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_FLB$HIP_morning,all_FLB$HIP_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_FLB$THA_morning,all_FLB$THA_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_FLB$AMG_morning,all_FLB$AMG_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_FLB$CAU_morning,all_FLB$CAU_afternoon)$conf.int[2])
+ci_upper <- c(ci_upper,cor.test(all_FLB$PUT_morning,all_FLB$PUT_afternoon)$conf.int[2])
+
+
+sq_R <- corrFLB^2
+
+ROI <- c("OC","FC","TC","HIP","THA","AMG","CAU","PUT")
+
+corrFLBCi <- data.frame(ROI, corrFLB, sq_R, ci_lower,ci_upper)
+
+#writexl::write_xlsx(stats_raclo, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/stats_raclo2.xlsx") #NOT NEEDED
+#writexl::write_xlsx(stats_FLB, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/stats_FLB2.xlsx") #NOT NEEDED
+
+#correlation between morning an afternoon
+writexl::write_xlsx(corrRacCi, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/Tbl_corr_Raclo.xlsx") #column 3, table 2.
+writexl::write_xlsx(corrFLBCi, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/Tbl_corr_FLB.xlsx")
+#Column 2, table 2
+
+```
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+GG-plot with morning runs correlated to afternoon runs - flb
+:::::::::::::::::::::::::::::::::::::::::::::::::
+
+Figure 2
+```{r}
+
+#Correlation in the form of a facet wrap:
+setwd("X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results")
+library(tidyverse)
+
+ROI <- c("FC","FC","FC","FC","FC","FC","FC","FC","OC","OC","OC","OC","OC","OC","OC","OC","TC","TC","TC","TC","TC","TC","TC","TC","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","THA","THA","THA","THA","THA","THA","THA","THA")
+
+all_FLB <- merge(x = FLB_morning,FLB_afternoon,by = 'Subject')
+
+morning <- c(all_FLB$FC_morning,all_FLB$OC_morning,all_FLB$TC_morning,all_FLB$AMG_morning,all_FLB$HIP_morning,all_FLB$THA_morning)
+
+afternoon <- c(all_FLB$FC_afternoon,all_FLB$OC_afternoon,all_FLB$TC_afternoon,all_FLB$AMG_afternoon,all_FLB$HIP_afternoon,all_FLB$THA_afternoon)
+
+FLB_plot <- data.frame(ROI,morning,afternoon)
+
+neworder <- c("OC","FC","TC","HIP","THA","AMG")
+FLB_plot2 <- arrange(transform(FLB_plot,
+             ROI=factor(ROI,levels=neworder)),ROI)
+
+flb <- ggplot(FLB_plot2,aes(x=morning,y= afternoon,color=ROI))+
+  geom_point() + 
+  geom_smooth(method = 'lm',se = F) +  
+  facet_wrap(ROI ~ ., scales = 'free') +
+  labs(y= "PET 1",x = "PET 2")+
+  ggtitle("Correlation between [11C]FLB-457 PET 1 and PET 2")+
+  theme(plot.title = element_text(hjust =0.5)) + 
+  theme_bw() 
+
+print(flb)
+ggsave("corr_FLB_ampm_all.png") #Upper image of Figure 2.
+```
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+GG-plot with morning runs correlated to afternoon runs - raclopride
+:::::::::::::::::::::::::::::::::::::::::::::::::
+
+Figure 2
+```{r}
+
+#Correlation in the form of a facet wrap:
+setwd("X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results")  
+library(tidyverse)
+
+ROI <- c("FC","FC","FC","FC","FC","FC","FC","FC","OC","OC","OC","OC","OC","OC","OC","OC","TC","TC","TC","TC","TC","TC","TC","TC","AMG","AMG","AMG","AMG","AMG","AMG","AMG","AMG","HIP","HIP","HIP","HIP","HIP","HIP","HIP","HIP","THA","THA","THA","THA","THA","THA","THA","THA")
+
+
+all_raclo <- merge(x = raclo_morning,raclo_afternoon,by = 'Subject')
+
+
+morning_r <- c(all_raclo$FC_morning,all_raclo$OC_morning,all_raclo$TC_morning,all_raclo$AMG_morning,all_raclo$HIP_morning,all_raclo$THA_morning)
+
+afternoon_r <- c(all_raclo$FC_afternoon,all_raclo$OC_afternoon,all_raclo$TC_afternoon,all_raclo$AMG_afternoon,all_raclo$HIP_afternoon,all_raclo$THA_afternoon)
+
+subjects <- c(all_raclo$Subject,all_raclo$Subject,all_raclo$Subject,all_raclo$Subject,all_raclo$Subject,all_raclo$Subject)
+
+raclo_plot <- data.frame(ROI,morning_r,afternoon_r,subjects)
+
+neworder <- c("OC","FC","TC","HIP","THA","AMG")
+raclo_plot2 <- arrange(transform(raclo_plot,
+             ROI=factor(ROI,levels=neworder)),ROI)
+
+raclo <- ggplot(raclo_plot2,aes(x=morning_r,y= afternoon_r,color=ROI))+
+  geom_point() + 
+  geom_smooth(method = 'lm',se = F) +  
+  facet_wrap(ROI ~ ., scales = 'free') +
+  labs(y= "PET 1",x = "PET 2")+
+  ggtitle("Correlation between [11C]raclopride PET 1 and PET 2")+
+  theme(plot.title = element_text(hjust =0.5)) + 
+  theme_bw() 
+
+print(raclo)
+ggsave("corr_raclo_ampm_all.png") #Lower image of Figure 2.
+
+
+```
+
+::::::::::::::::::::::::::::::::::::
+
+
+SUPPLEMENTARY
+
+::::::::::::::::::::::::::::::::::::
+
+Correlation plot - including error bars
+Supp Figure 1
+```{r}
+#setwd("X:/kipet/atlas_images/human/vff/Tove/Results_R_RLS")
+setwd("X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results")
+
+
+rownames(Statisticsexs)<- Statisticsexs$ROI
+library(ggplot2) #Loading the ggplot package
+pi <- ggplot(Statisticsexs,aes(x= mean_raclo, y= mean_FLB, label = rownames(Statisticsexs))) + 
+    geom_point() + 
+    geom_errorbar(aes(ymin = mean_FLB-ci_FLB, ymax= mean_FLB+ci_FLB), width = 0.002, size = 0.3, color = "black") +
+    geom_errorbarh(aes(xmin = mean_raclo-ci_raclo, xmax= mean_raclo+ci_raclo), width = 0.5, size = 0.3, color = "black") +
+    geom_text(check_overlap = FALSE, vjust = 0, nudge_y = 0.15, nudge_x = 0.01 ) +
+    labs(x = "[11C]Raclopride", y = "[11C]FLB-457")+
+    geom_smooth(method = "lm", se = TRUE) +
+    ggtitle("Correlation between mean BPND for [11C]FLB-457 and [11C]Raclopride")+
+    theme(plot.title = element_text(hjust =0.5))
+
+print(pi)
+ggsave("correrr_xins.png") #Supplementary figure 1
+```
+
+
+
+Get statistics for test-retest using Granville's statistics package 'relfeas'
+devtools::install_github(repo = "mathesong/relfeas") 
+
+test-retest using relfeas - supplementary
+```{r}
+library(relfeas)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(pwr)
+library(knitr)
+
+all_raclo <- merge(x = PET1_SRTM,y = PET2_SRTM,by = 'Subject')
+oc <- data.frame(all_raclo$OC.x,all_raclo$OC.y)
+oc1 <- gather(oc) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_oc <- trt(oc1, 'value', 'indiv', 'key')$tidy
+
+fc <- data.frame(all_raclo$FC.x,all_raclo$FC.y)
+fc1 <- gather(fc) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_fc <- trt(fc1, 'value', 'indiv', 'key')$tidy
+
+tc <- data.frame(all_raclo$TC.x,all_raclo$TC.y)
+tc1 <- gather(tc) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_tc <- trt(tc1, 'value', 'indiv', 'key')$tidy
+
+hip <- data.frame(all_raclo$HIP.x,all_raclo$HIP.y)
+hip1 <- gather(hip) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_hip <- trt(hip1, 'value', 'indiv', 'key')$tidy
+
+tha <- data.frame(all_raclo$THA.x,all_raclo$THA.y)
+tha1 <- gather(tha) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_tha <- trt(tha1, 'value', 'indiv', 'key')$tidy
+
+amg <- data.frame(all_raclo$AMG.x,all_raclo$AMG.y)
+amg1 <- gather(amg) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_amg <- trt(amg1, 'value', 'indiv', 'key')$tidy
+
+cau <- data.frame(all_raclo$CAU.x,all_raclo$CAU.y)
+cau1 <- gather(cau) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_cau <- trt(cau1, 'value', 'indiv', 'key')$tidy
+
+put <- data.frame(all_raclo$PUT.x,all_raclo$PUT.y)
+put1 <- gather(put) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_put <- trt(put1, 'value', 'indiv', 'key')$tidy
+
+stats_raclo <- rbind(stat_oc,stat_fc,stat_tc,stat_hip,stat_tha,stat_amg,stat_cau,stat_put)
+ROI <- c("OC","FC","TC","HIP","THA","AMG","CAU","PUT")
+stats_raclo <- cbind(ROI,stats_raclo)
+writexl::write_xlsx(stats_raclo, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/stats_raclo_rel.xlsx") #Part 1 of supp Table 1
+
+#FLB:
+
+all_flb <- merge(x = PET3_SRTM,y = PET4_SRTM,by = 'Subject')
+oc <- data.frame(all_flb$OC.x,all_flb$OC.y)
+oc1 <- gather(oc) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_oc <- trt(oc1, 'value', 'indiv', 'key')$tidy
+
+fc <- data.frame(all_flb$FC.x,all_flb$FC.y)
+fc1 <- gather(fc) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_fc <- trt(fc1, 'value', 'indiv', 'key')$tidy
+
+tc <- data.frame(all_flb$TC.x,all_flb$TC.y)
+tc1 <- gather(tc) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_tc <- trt(tc1, 'value', 'indiv', 'key')$tidy
+
+hip <- data.frame(all_flb$HIP.x,all_flb$HIP.y)
+hip1 <- gather(hip) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_hip <- trt(hip1, 'value', 'indiv', 'key')$tidy
+
+tha <- data.frame(all_flb$THA.x,all_flb$THA.y)
+tha1 <- gather(tha) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_tha <- trt(tha1, 'value', 'indiv', 'key')$tidy
+
+amg <- data.frame(all_flb$AMG.x,all_flb$AMG.y)
+amg1 <- gather(amg) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_amg <- trt(amg1, 'value', 'indiv', 'key')$tidy
+
+cau <- data.frame(all_flb$CAU.x,all_flb$CAU.y)
+cau1 <- gather(cau) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_cau <- trt(cau1, 'value', 'indiv', 'key')$tidy
+
+put <- data.frame(all_flb$PUT.x,all_flb$PUT.y)
+put1 <- gather(put) %>%
+  mutate(indiv = rep(paste0('s', 1:8), times=2))
+stat_put <- trt(put1, 'value', 'indiv', 'key')$tidy
+
+stats_flb <- rbind(stat_oc,stat_fc,stat_tc,stat_hip,stat_tha,stat_amg,stat_cau,stat_put)
+ROI <- c("OC","FC","TC","HIP","THA","AMG","CAU","PUT")
+stats_flb <- cbind(ROI,stats_flb)
+writexl::write_xlsx(stats_flb, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/stats_flb_rel.xlsx") #part 1 of supp table 2
+```
+
+Simplified TrT for raclo
+- for supp Table 1
+```{r}
+Rac1 <- NULL
+Rac2 <- NULL
+
+all_raclo <- NULL
+all_raclo <- data.frame()
+raclo_morning <- PET1_SRTM[,-c(7,9)] #remove data for insula and cer!
+colnames(raclo_morning)<-c("Subject","FC_morning","OC_morning","TC_morning","AMG_morning","CAU_morning","HIP_morning","PUT_morning","THA_morning")
+
+
+
+raclo_afternoon <-PET2_SRTM[,-c(7,9)]
+colnames(raclo_afternoon)<- c("Subject","FC_afternoon","OC_afternoon","TC_afternoon","AMG_afternoon","CAU_afternoon","HIP_afternoon","PUT_afternoon","THA_afternoon")
+all_raclo <- merge(x = raclo_morning,raclo_afternoon,by = 'Subject') 
+
+Rac1 <- rbind(Rac1, summarySE(data = all_raclo, measurevar = "OC_morning"))
+Rac1 <- rbind(Rac1, summarySE(data = all_raclo, measurevar = "FC_morning"))
+Rac1 <- rbind(Rac1, summarySE(data = all_raclo, measurevar = "TC_morning"))
+Rac1 <- rbind(Rac1, summarySE(data = all_raclo, measurevar = "HIP_morning"))
+Rac1 <- rbind(Rac1, summarySE(data = all_raclo, measurevar = "THA_morning"))
+Rac1 <- rbind(Rac1, summarySE(data = all_raclo, measurevar = "AMG_morning"))
+Rac1 <- rbind(Rac1, summarySE(data = all_raclo, measurevar = "CAU_morning"))
+Rac1 <- rbind(Rac1, summarySE(data = all_raclo, measurevar = "PUT_morning"))
+Rac1 <- Rac1[,c(4,5)]
+
+Rac2 <- rbind(Rac2, summarySE(data = all_raclo, measurevar = "OC_afternoon"))
+Rac2 <- rbind(Rac2, summarySE(data = all_raclo, measurevar = "FC_afternoon"))
+Rac2 <- rbind(Rac2, summarySE(data = all_raclo, measurevar = "TC_afternoon"))
+Rac2 <- rbind(Rac2, summarySE(data = all_raclo, measurevar = "HIP_afternoon"))
+Rac2 <- rbind(Rac2, summarySE(data = all_raclo, measurevar = "THA_afternoon"))
+Rac2 <- rbind(Rac2, summarySE(data = all_raclo, measurevar = "AMG_afternoon"))
+Rac2 <- rbind(Rac2, summarySE(data = all_raclo, measurevar = "CAU_afternoon"))
+Rac2 <- rbind(Rac2, summarySE(data = all_raclo, measurevar = "PUT_afternoon"))
+Rac2 <- Rac2[,c(4,5)]
+
+
+ROI <- c("OC","FC","TC","HIP","THA","AMG","CAU","PUT")
+SEM <- Statistics$se_raclo
+trt_simple_rac <- cbind(ROI,Rac1,Rac2,SEM)
+colnames(trt_simple_rac) <- c("ROI","PET 1 mean BPND","PET 1 sd","PET 2 mean BPND","PET 2 sd","SEM")
+writexl::write_xlsx(trt_simple_rac, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/trt_simple_rac.xlsx") #Column 1-3 of supp table 1.
+```
+
+Simplified Trt FLB
+
+Supp table 2
+:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::::::::::::::::
+```{r}
+FLB1 <- NULL
+FLB2 <- NULL
+
+all_FLB <-NULL
+all_FLB <- data.frame()
+FLB_morning <- PET3_SRTM[,-c(7,9)]
+colnames(FLB_morning)<-c("Subject","FC_morning","OC_morning","TC_morning","AMG_morning","CAU_morning","HIP_morning","PUT_morning","THA_morning")
+
+FLB_afternoon <- PET4_SRTM[,-c(7,9)]
+colnames(FLB_afternoon)<- c("Subject","FC_afternoon","OC_afternoon","TC_afternoon","AMG_afternoon","CAU_afternoon","HIP_afternoon","PUT_afternoon","THA_afternoon")
+
+all_FLB <- merge(x = FLB_morning,FLB_afternoon,by = 'Subject')
+
+FLB1 <- rbind(FLB1, summarySE(data = all_FLB, measurevar = "OC_morning"))
+FLB1 <- rbind(FLB1, summarySE(data = all_FLB, measurevar = "FC_morning"))
+FLB1 <- rbind(FLB1, summarySE(data = all_FLB, measurevar = "TC_morning"))
+FLB1 <- rbind(FLB1, summarySE(data = all_FLB, measurevar = "HIP_morning"))
+FLB1 <- rbind(FLB1, summarySE(data = all_FLB, measurevar = "THA_morning"))
+FLB1 <- rbind(FLB1, summarySE(data = all_FLB, measurevar = "AMG_morning"))
+FLB1 <- rbind(FLB1, summarySE(data = all_FLB, measurevar = "CAU_morning"))
+FLB1 <- rbind(FLB1, summarySE(data = all_FLB, measurevar = "PUT_morning"))
+FLB1 <- FLB1[,c(4,5)]
+
+FLB2 <- rbind(FLB2, summarySE(data = all_FLB, measurevar = "OC_afternoon"))
+FLB2 <- rbind(FLB2, summarySE(data = all_FLB, measurevar = "FC_afternoon"))
+FLB2 <- rbind(FLB2, summarySE(data = all_FLB, measurevar = "TC_afternoon"))
+FLB2 <- rbind(FLB2, summarySE(data = all_FLB, measurevar = "HIP_afternoon"))
+FLB2 <- rbind(FLB2, summarySE(data = all_FLB, measurevar = "THA_afternoon"))
+FLB2 <- rbind(FLB2, summarySE(data = all_FLB, measurevar = "AMG_afternoon"))
+FLB2 <- rbind(FLB2, summarySE(data = all_FLB, measurevar = "CAU_afternoon"))
+FLB2 <- rbind(FLB2, summarySE(data = all_FLB, measurevar = "PUT_afternoon"))
+FLB2 <- FLB2[,c(4,5)]
+
+ROI <- c("OC","FC","TC","HIP","THA","AMG","CAU","PUT")
+SEMf <- Statistics$se_FLB
+trt_simple_flb <- cbind(ROI,FLB1,FLB2,SEMf)
+colnames(trt_simple_flb) <- c("ROI","PET 1 mean BPND","PET 1 sd","PET 2 mean BPND","PET 2 sd","SEM")
+
+writexl::write_xlsx(trt_simple_flb, "X:/kipet/atlas_images/human/vff/Tove/Analysis in R/results/trt_simple_flb.xlsx") #Column 1-3 of supp table 2.
+```
+
+
